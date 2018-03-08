@@ -7,9 +7,9 @@ const importLazy = require('import-lazy')(require);
 const configstore = importLazy('configstore');
 const chalk = importLazy('chalk');
 const semverDiff = importLazy('semver-diff');
-const latestVersion = importLazy('latest-version');
+const latestSemver = importLazy('latest-semver');
+const fetch = importLazy('node-fetch');
 const isNpm = importLazy('is-npm');
-const isInstalledGlobally = importLazy('is-installed-globally');
 const boxen = importLazy('boxen');
 const xdgBasedir = importLazy('xdg-basedir');
 const isCi = importLazy('is-ci');
@@ -35,6 +35,7 @@ class UpdateNotifier {
 		this.packageName = options.pkg.name;
 		this.packageVersion = options.pkg.version;
 		this.updateCheckInterval = typeof options.updateCheckInterval === 'number' ? options.updateCheckInterval : ONE_DAY;
+		this.tagsUrl = options.tagsUrl;
 		this.hasCallback = typeof options.callback === 'function';
 		this.callback = options.callback || (() => {});
 		this.disabled = 'NO_UPDATE_NOTIFIER' in process.env ||
@@ -66,7 +67,7 @@ class UpdateNotifier {
 	}
 	check() {
 		if (this.hasCallback) {
-			this.checkNpm()
+			this.checkLatestVersion()
 				.then(update => this.callback(null, update))
 				.catch(err => this.callback(err));
 			return;
@@ -97,25 +98,29 @@ class UpdateNotifier {
 			stdio: 'ignore'
 		}).unref();
 	}
-	checkNpm() {
-		return latestVersion()(this.packageName).then(latestVersion => {
-			return {
-				latest: latestVersion,
-				current: this.packageVersion,
-				type: semverDiff()(this.packageVersion, latestVersion) || 'latest',
-				name: this.packageName
-			};
-		});
+	checkLatestVersion() {
+    return fetch()(this.tagsUrl)
+			.then(res => res.json())
+			.then((tagObjects) => {
+        let tags = tagObjects.map((tag) => tag.name);
+        return latestSemver()(tags);
+      })
+			.then((latestVersion) => {
+        return {
+          latest: latestVersion,
+          current: this.packageVersion,
+          type: semverDiff()(this.packageVersion, latestVersion) || 'latest',
+          name: this.packageName,
+        };
+      });
 	}
 	notify(opts) {
 		if (!process.stdout.isTTY || isNpm() || !this.update) {
 			return this;
 		}
 
-		opts = Object.assign({isGlobal: isInstalledGlobally()}, opts);
-
-		opts.message = opts.message || 'Update available ' + chalk().dim(this.update.current) + chalk().reset(' → ') +
-			chalk().green(this.update.latest) + ' \nRun ' + chalk().cyan('npm i ' + (opts.isGlobal ? '-g ' : '') + this.packageName) + ' to update';
+    const updateMessage = 'Update available ' + chalk().dim(this.update.current) + chalk().reset(' → ') + chalk().green(this.update.latest);
+    const rawMessage = opts.message || updateMessage + '\n' + opts.getDetails(this.update);
 
 		opts.boxenOpts = opts.boxenOpts || {
 			padding: 1,
@@ -125,7 +130,7 @@ class UpdateNotifier {
 			borderStyle: 'round'
 		};
 
-		const message = '\n' + boxen()(opts.message, opts.boxenOpts);
+		const message = '\n' + boxen()(rawMessage, opts.boxenOpts);
 
 		if (opts.defer === false) {
 			console.error(message);

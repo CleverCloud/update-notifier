@@ -1,6 +1,6 @@
-# update-notifier [![Build Status](https://travis-ci.org/yeoman/update-notifier.svg?branch=master)](https://travis-ci.org/yeoman/update-notifier)
+# update-notifier-tags
 
-> Update notifications for your CLI app
+> Update notifications for your CLI app using a remote list of tags
 
 ![](screenshot.png)
 
@@ -19,7 +19,7 @@ Inform users of your package of updates in a non-intrusive way.
 ## Install
 
 ```
-$ npm install update-notifier
+$ npm install CleverCloud/update-notifier
 ```
 
 
@@ -31,7 +31,7 @@ $ npm install update-notifier
 const updateNotifier = require('update-notifier');
 const pkg = require('./package.json');
 
-updateNotifier({pkg}).notify();
+updateNotifier({ pkg, tagsUrl: 'https://api.github.com/repos/[org]/[project]/tags' }).notify();
 ```
 
 ### Comprehensive
@@ -41,7 +41,7 @@ const updateNotifier = require('update-notifier');
 const pkg = require('./package.json');
 
 // Checks for available update and returns an instance
-const notifier = updateNotifier({pkg});
+const notifier = updateNotifier({ pkg, tagsUrl: 'https://api.github.com/repos/[org]/[project]/tags' });
 
 // Notify using the built-in convenience method
 notifier.notify();
@@ -63,6 +63,7 @@ console.log(notifier.update);
 ```js
 const notifier = updateNotifier({
 	pkg,
+	tagsUrl: 'https://api.github.com/repos/[org]/[project]/tags',
 	updateCheckInterval: 1000 * 60 * 60 * 24 * 7 // 1 week
 });
 
@@ -109,6 +110,13 @@ Default: `1000 * 60 * 60 * 24` *(1 day)*
 
 How often to check for updates.
 
+#### tagsUrl
+
+Type: `string`<br>
+
+A public remote URL providing an array of tag objects with a `name`.
+GitHub and GitLab offer that.
+
 #### callback(error, update)
 
 Type: `Function`
@@ -138,6 +146,12 @@ Type: `string`<br>
 Default: [See above screenshot](https://github.com/yeoman/update-notifier#update-notifier-)
 
 Message that will be shown when an update is available.
+
+##### getDetails
+
+Type: `function`<br>
+
+A function to customize the details of the message (below first line about versions). 
 
 ##### isGlobal
 
